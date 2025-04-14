@@ -1,15 +1,794 @@
 <!DOCTYPE html>
-<html lang="">
-  <head>
+<html lang="zh-CN">
+<head>
     <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="node_modules\qweather-icons\font\qweather-icons.css">
-    <title>Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
+    <title>空气质量监测</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            color: white;
+            background: linear-gradient(135deg, #1a1a1a 0%, #0d0d0d 100%);
+        }
 
+        .container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 1rem;
+        }
+
+        @media (min-width: 768px) {
+            .container {
+                padding: 2rem;
+            }
+        }
+
+        .loading-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+            border-radius: 50%;
+            height: 4rem;
+            width: 4rem;
+            border-top: 4px solid rgba(59, 130, 246, 0.5);
+            margin: 0 auto 1rem;
+        }
+
+        .error-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .error-card {
+            text-align: center;
+            max-width: 28rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+        }
+
+        .error-icon {
+            font-size: 2.25rem;
+            color: #f87171;
+            margin-bottom: 1rem;
+        }
+
+        .retry-button {
+            padding: 0.5rem 1.5rem;
+            background-color: #2563eb;
+            border-radius: 9999px;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .retry-button:hover {
+            background-color: #1d4ed8;
+        }
+
+        .main-content {
+            max-width: 80rem;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .header {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        @media (min-width: 768px) {
+            .header {
+                flex-direction: row;
+                align-items: center;
+            }
+        }
+
+        .refresh-button {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        @media (min-width: 768px) {
+            .refresh-button {
+                font-size: 1rem;
+            }
+        }
+
+        .refresh-button:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .grid-cols-1 {
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+        }
+
+        .grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .grid-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .gap-4 {
+            gap: 1rem;
+        }
+
+        .gap-6 {
+            gap: 1.5rem;
+        }
+
+        .card {
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .aqi-value {
+            font-size: 4.5rem;
+            font-weight: 700;
+            color: white;
+            text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .aqi-category {
+            font-size: 1.5rem;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+        }
+
+        .advice-box {
+            background-color: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            padding: 1rem;
+            border-radius: 0.75rem;
+            width: 100%;
+            text-align: center;
+        }
+
+        .weather-card {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .weather-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .weather-icon {
+            font-size: 3rem;
+            opacity: 0.9;
+        }
+
+        .temp-display {
+            display: flex;
+            align-items: baseline;
+            margin-bottom: 0.5rem;
+        }
+
+        .temp-value {
+            font-size: 3.75rem;
+            font-weight: 700;
+        }
+
+        .temp-unit {
+            font-size: 1.875rem;
+            opacity: 0.9;
+            margin-left: 0.25rem;
+        }
+
+        .pollutant-card {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .pollutant-card:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .footer {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .mb-1 {
+            margin-bottom: 0.25rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .mt-1 {
+            margin-top: 0.25rem;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .mt-6 {
+            margin-top: 1.5rem;
+        }
+
+        .mr-2 {
+            margin-right: 0.5rem;
+        }
+
+        .ml-1 {
+            margin-left: 0.25rem;
+        }
+
+        .ml-2 {
+            margin-left: 0.5rem;
+        }
+
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .px-6 {
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+        }
+
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .py-3 {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        .p-4 {
+            padding: 1rem;
+        }
+
+        .p-5 {
+            padding: 1.25rem;
+        }
+
+        .p-6 {
+            padding: 1.5rem;
+        }
+
+        .rounded-xl {
+            border-radius: 0.75rem;
+        }
+
+        .rounded-full {
+            border-radius: 9999px;
+        }
+
+        .text-lg {
+            font-size: 1.125rem;
+            line-height: 1.75rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+            line-height: 1.75rem;
+        }
+
+        .text-2xl {
+            font-size: 1.5rem;
+            line-height: 2rem;
+        }
+
+        .text-3xl {
+            font-size: 1.875rem;
+            line-height: 2.25rem;
+        }
+
+        .text-4xl {
+            font-size: 2.25rem;
+            line-height: 2.5rem;
+        }
+
+        .text-6xl {
+            font-size: 3.75rem;
+            line-height: 1;
+        }
+
+        .text-7xl {
+            font-size: 4.5rem;
+            line-height: 1;
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+            line-height: 1rem;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .opacity-90 {
+            opacity: 0.9;
+        }
+
+        .opacity-80 {
+            opacity: 0.8;
+        }
+
+        .opacity-70 {
+            opacity: 0.7;
+        }
+
+        .opacity-60 {
+            opacity: 0.6;
+        }
+
+        .opacity-50 {
+            opacity: 0.5;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        .inline-block {
+            display: inline-block;
+        }
+
+        .grid {
+            display: grid;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Weather icons - using Quill Icons as placeholder */
+        .qi-wind-fill:before {
+            content: "🌬️";
+        }
+
+        .qi-cloudy-fill:before {
+            content: "☁️";
+        }
+
+        .qi-haze-fill:before {
+            content: "🌫️";
+        }
+
+        .qi-fog-fill:before {
+            content: "🌁";
+        }
+
+        .qi-dust-fill:before {
+            content: "💨";
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1024px) {
+            .lg\:grid-cols-2 {
+                grid-template-columns: repeat(1, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sm\:grid-cols-3 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 640px) {
+            .grid-cols-4, .grid-cols-3, .grid-cols-2 {
+                grid-template-columns: repeat(1, minmax(0, 1fr));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading" class="loading-container">
+            <div class="text-center">
+                <div class="loading-spinner"></div>
+                <p class="text-lg opacity-80">正在获取空气质量数据...</p>
+            </div>
+        </div>
+
+        <div id="error" class="error-container hidden">
+            <div class="error-card">
+                <i class="fas fa-exclamation-triangle error-icon"></i>
+                <h2 class="text-xl font-bold mb-2">无法获取数据</h2>
+                <p class="opacity-80 mb-4" id="error-message"></p>
+                <button onclick="fetchAirQuality()" class="retry-button">
+                    <i class="fas fa-sync-alt mr-2"></i>重试
+                </button>
+            </div>
+        </div>
+
+        <div id="content" class="main-content hidden">
+            <div class="header">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-bold opacity-90">空气质量监测</h1>
+                    <p class="text-sm opacity-60 mt-1">
+                        <i class="fas fa-map-marker-alt mr-2"></i>
+                        <span id="location">当前位置: 正在获取...</span>
+                    </p>
+                </div>
+                <div class="refresh-button" onclick="fetchAirQuality()" title="点击刷新数据">
+                    <i class="fas fa-sync-alt mr-2" id="refresh-icon"></i>
+                    <span id="update-time">正在更新...</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- AQI主卡片 -->
+                <div id="aqi-card" class="card">
+                    <div class="flex flex-col items-center h-full">
+                        <!-- AQI数值和图标 -->
+                        <div class="flex items-center justify-center mb-4 gap-4 w-full">
+                            <div id="aqi-value" class="aqi-value">--</div>
+                            <!-- AQI类别 -->
+                            <div id="aqi-category" class="aqi-category">未知</div>
+                        </div>
+                        <!-- 健康建议 -->
+                        <div class="advice-box">
+                            <p id="aqi-advice">正在获取健康建议...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 天气卡片 -->
+                <div id="weather-card" class="card hidden">
+                    <div class="weather-card">
+                        <div class="weather-header">
+                            <div>
+                                <h2 class="text-2xl font-semibold mb-1">当前天气</h2>
+                                <p id="weather-text" class="text-lg opacity-90">--</p>
+                            </div>
+                            <i id="weather-icon" class="weather-icon"></i>
+                        </div>
+
+                        <div class="mt-auto">
+                            <div class="temp-display">
+                                <span id="temp-value" class="temp-value">--</span>
+                                <span class="temp-unit">°C</span>
+                            </div>
+
+                            <a id="weather-link" href="#" target="_blank" class="inline-block mt-4 text-sm bg-white/10 hover:bg-white/20 px-4 py-2 rounded-full transition-colors">
+                                <i class="fas fa-external-link-alt mr-2"></i>查看详细天气预报
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 污染物网格 -->
+            <div id="pollutants-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <!-- Pollutants will be added here dynamically -->
+            </div>
+
+            <!-- 底部信息 -->
+            <div class="footer">
+                <p id="data-time">数据更新时间: 正在获取...</p>
+                <p class="mt-1">信息由和风天气API提供</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State variables
+        let aqiData = null;
+        let weatherData = null;
+        let loading = true;
+        let error = null;
+        let updateInterval = null;
+
+        // DOM elements
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
+        const contentEl = document.getElementById('content');
+        const errorMessageEl = document.getElementById('error-message');
+        const locationEl = document.getElementById('location');
+        const updateTimeEl = document.getElementById('update-time');
+        const refreshIconEl = document.getElementById('refresh-icon');
+        const aqiCardEl = document.getElementById('aqi-card');
+        const aqiValueEl = document.getElementById('aqi-value');
+        const aqiCategoryEl = document.getElementById('aqi-category');
+        const aqiAdviceEl = document.getElementById('aqi-advice');
+        const weatherCardEl = document.getElementById('weather-card');
+        const weatherTextEl = document.getElementById('weather-text');
+        const weatherIconEl = document.getElementById('weather-icon');
+        const tempValueEl = document.getElementById('temp-value');
+        const weatherLinkEl = document.getElementById('weather-link');
+        const pollutantsGridEl = document.getElementById('pollutants-grid');
+        const dataTimeEl = document.getElementById('data-time');
+
+        // 根据AQI值获取对应的背景颜色和图标
+        function getAqiInfo(aqi) {
+            if (aqi <= 50) return {
+                background: 'linear-gradient(135deg, #a8e063 0%, #56ab2f 100%)',
+                icon: 'qi-wind-fill',
+                advice: '空气质量令人满意，基本无空气污染'
+            };
+            if (aqi <= 100) return {
+                background: 'linear-gradient(135deg, #f9d423 0%, #ff7e00 100%)',
+                icon: 'qi-cloudy-fill',
+                advice: '空气质量可接受，但某些污染物可能对极少数异常敏感人群健康有较弱影响'
+            };
+            if (aqi <= 150) return {
+                background: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)',
+                icon: 'qi-haze-fill',
+                advice: '易感人群症状有轻度加剧，健康人群出现刺激症状'
+            };
+            if (aqi <= 200) return {
+                background: 'linear-gradient(135deg, #ff6b6b 0%, #c0392b 100%)',
+                icon: 'qi-fog-fill',
+                advice: '进一步加剧易感人群症状，可能对健康人群心脏、呼吸系统有影响'
+            };
+            return {
+                background: 'linear-gradient(135deg, #8e44ad 0%, #5d2a82 100%)',
+                icon: 'qi-dust-fill',
+                advice: '健康人群运动耐受力降低，有明显强烈症状，提前出现某些疾病'
+            };
+        }
+
+        // 获取用户地理位置
+        function getGeoLocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject('浏览器不支持地理定位功能');
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        resolve({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        });
+                    },
+                    (err) => {
+                        const errors = {
+                            1: '权限被拒绝',
+                            2: '位置信息不可用',
+                            3: '请求超时'
+                        };
+                        reject(errors[err.code] || '无法获取位置信息');
+                    },
+                    { timeout: 10000 }
+                );
+            });
+        }
+
+        // 获取空气质量数据
+        async function fetchAirQuality() {
+            try {
+                // Show loading state
+                loading = true;
+                error = null;
+                loadingEl.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+                contentEl.classList.add('hidden');
+                refreshIconEl.classList.add('animate-spin');
+
+                // Get location
+                const { latitude, longitude } = await getGeoLocation();
+
+                // Get weather data
+                const weatherRes = await fetch(`https://mn6cdmfa3y.re.qweatherapi.com/v7/weather/now?location=${longitude},${latitude}&key=3ad25966b84645e4bb2b765e7d0c3d7c`);
+                const weatherJson = await weatherRes.json();
+                
+                const { now } = weatherJson;
+                weatherData = {
+                    temp: now.temp,
+                    text: now.text,
+                    icon: now.icon,
+                    fxLink: weatherJson.fxLink,
+                    isRainy: now.icon.includes('rain') || now.icon.includes('snow'),
+                    isSunny: now.icon.includes('sunny') || now.icon.includes('clear'),
+                    isCloudy: now.icon.includes('cloudy')
+                };
+
+                // Update weather UI
+                weatherTextEl.textContent = weatherData.text;
+                weatherIconEl.className = `qi-${weatherData.icon}-fill weather-icon`;
+                tempValueEl.textContent = weatherData.temp;
+                weatherLinkEl.href = weatherData.fxLink;
+                
+                // Apply weather card style
+                weatherCardEl.className = 'card';
+                if (weatherData.isRainy) {
+                    weatherCardEl.classList.add('bg-gradient-to-br', 'from-blue-400/20', 'to-blue-600/30');
+                } else if (weatherData.isSunny) {
+                    weatherCardEl.classList.add('bg-gradient-to-br', 'from-yellow-400/20', 'to-amber-600/30');
+                } else if (weatherData.isCloudy) {
+                    weatherCardEl.classList.add('bg-gradient-to-br', 'from-gray-400/20', 'to-gray-600/30');
+                } else {
+                    weatherCardEl.classList.add('bg-white/10');
+                }
+                weatherCardEl.classList.remove('hidden');
+
+                // Get air quality data
+                const aqiRes = await fetch(`https://mn6cdmfa3y.re.qweatherapi.com/airquality/v1/current/${latitude}/${longitude}?key=3ad25966b84645e4bb2b765e7d0c3d7c`);
+                const aqiJson = await aqiRes.json();
+                const { aqi, category, color, health } = aqiJson.indexes[0];
+                const aqiInfo = getAqiInfo(aqi);
+
+                aqiData = {
+                    aqi,
+                    background: aqiInfo.background,
+                    category,
+                    color: `rgb(${color.red},${color.green},${color.blue})`,
+                    effect: health.effect,
+                    advice: aqiInfo.advice,
+                    icon: aqiInfo.icon,
+                    pollutants: aqiJson.pollutants.map(p => ({
+                        name: p.name,
+                        concentration: p.concentration.value,
+                        unit: p.concentration.unit
+                    })),
+                    pos: aqiJson.stations[0].name,
+                    updateTime: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+                };
+
+                // Update AQI UI
+                aqiCardEl.style.background = aqiData.background;
+                aqiValueEl.textContent = aqiData.aqi;
+                aqiCategoryEl.textContent = aqiData.category;
+                aqiAdviceEl.textContent = aqiData.effect || aqiData.advice;
+                locationEl.textContent = `当前位置: ${aqiData.pos}`;
+                updateTimeEl.textContent = `${aqiData.updateTime}更新`;
+
+                // Update pollutants
+                pollutantsGridEl.innerHTML = '';
+                aqiData.pollutants.forEach(p => {
+                    const pollutantEl = document.createElement('div');
+                    pollutantEl.className = 'pollutant-card';
+                    pollutantEl.innerHTML = `
+                        <div class="text-sm opacity-70 mb-2">${p.name}</div>
+                        <div class="text-3xl font-bold mb-1">${p.concentration}</div>
+                        <div class="text-xs opacity-50">${p.unit}</div>
+                    `;
+                    pollutantsGridEl.appendChild(pollutantEl);
+                });
+
+                // Update data time
+                dataTimeEl.textContent = `数据更新时间: ${new Date().toLocaleString('zh-CN')}`;
+
+                // Show content
+                loading = false;
+                loadingEl.classList.add('hidden');
+                contentEl.classList.remove('hidden');
+            } catch (err) {
+                error = err;
+                console.error('获取数据失败:', err);
+                
+                // Show error
+                errorMessageEl.textContent = typeof err === 'string' ? err : '无法获取空气质量数据';
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                contentEl.classList.add('hidden');
+            } finally {
+                refreshIconEl.classList.remove('animate-spin');
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchAirQuality();
+            
+            // Set up auto-refresh every 10 minutes
+            updateInterval = setInterval(fetchAirQuality, 600000);
+        });
+
+        // Clean up interval when page unloads
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
